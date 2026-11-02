@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "instagram-saver",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "BROWSER=true exec ./venv/bin/python app.py"],
+      "port": 8767
+    },
+    {
+      "name": "instagram-viewer",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "BROWSER=true exec ./venv/bin/python downloads/viewer_server.py"],
+      "port": 8779
+    },
+    {
+      "name": "instagram-saver-attach",
+      "url": "http://localhost:8767",
+      "port": 8767
+    },
+    {
+      "name": "instagram-viewer-attach",
+      "url": "http://localhost:8779",
+      "port": 8779
+    }
+  ]
+}

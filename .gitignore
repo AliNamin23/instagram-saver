@@ -1,0 +1,9 @@
+# Personal data and local runtime state: never commit
+downloads/
+config.json
+run_history.json
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/settings.local.json

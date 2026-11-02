@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Instagram Saver</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/viewer.css"><link rel="stylesheet" href="/panel.css">
+</head>
+<body>
+<header class="tv-head">
+  <div class="tv-brand"><b>Instagram Saver</b></div>
+  <div class="tv-actions">
+    <button id="pill" class="tv-pill" hidden></button>
+    <button id="btn-download" class="tv-btn primary">Download</button>
+    <button id="btn-auto" class="tv-btn">Automation</button>
+    <button id="btn-tools" class="tv-btn">Tools</button>
+  </div>
+</header>
+<div id="strip" class="tv-strip" hidden></div>
+<div id="v"></div>
+
+<div id="dl" class="tv-modal drawer" role="dialog" aria-modal="true" aria-label="Download">
+  <div class="card"><div class="mh"><b>Download</b><button class="tv-btn" data-close>Close</button></div><div id="panel"></div></div>
+</div>
+
+<script src="/viewer.js"></script><script src="/panel.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const media = p => '/files/' + p.split('/').map(encodeURIComponent).join('/');
+const fmtB = b => b >= 1e12 ? (b / 1e12).toFixed(2) + ' TB' : b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(0) + ' MB' : (b / 1e3).toFixed(0) + ' KB';
+const V = initViewer($('#v'), {
+  resolve: p => Promise.resolve(media(p)),
+  loadState: () => fetch('/state').then(r => r.json()),
+  saveState: s => fetch('/state', {method: 'POST', body: JSON.stringify(s)}),
+  fileSizes: paths => fetch('/api/sizes', {method: 'POST', body: JSON.stringify({paths})}).then(r => r.json()),
+  removeFiles: async i => { const r = await fetch('/delete', {method: 'POST', body: JSON.stringify({kind: i.kind, id: i.id})}); if (!r.ok) throw new Error((await r.json()).error || 'failed'); }
+});
+const sidecars = () => fetch('/api/sidecars').then(r => r.json()).then(s => V.mergeSidecars(s)).catch(() => {});
+async function load() { await V.set(await (await fetch('/items')).json()); sidecars(); }
+
+const openModal = id => $(id).classList.add('open');
+const closeModals = () => document.querySelectorAll('.tv-modal.open').forEach(m => m.classList.remove('open'));
+document.addEventListener('click', e => { if (e.target.matches('.tv-modal') || e.target.closest('[data-close]')) closeModals(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.querySelector('.vw-modal.open,.vw-lb.open,.pn-overlay:not([hidden])')) closeModals(); });
+
+function onStatus(s) {
+  const pill = $('#pill'), r = s.stats.run, l = s.stats.lib, d = s.disk, o = s.outcome;
+  pill.classList.remove('idle');
+  if (s.running) { pill.hidden = false; pill.textContent = `Downloading · +${(r ? r.posts : 0).toLocaleString()} new · ${fmtB(r ? r.bytes : 0)}`; }
+  else if (s.move.active) { pill.hidden = false; pill.textContent = `Moving library · ${s.move.total_bytes ? Math.round(100 * s.move.done_bytes / s.move.total_bytes) : 0}%`; }
+  else if (o && (o.kind === 'ok' || o.kind === 'none')) { pill.hidden = false; pill.classList.add('idle'); pill.textContent = 'Up to date'; }
+  else pill.hidden = true;
+  const free = d ? `<div class="v ${d.low ? 'bad' : d.free < d.min * 3 ? 'warn' : 'good'}">${fmtB(d.free)}</div>` : '<div class="v">–</div>';
+  const stripHtml = `<div><div class="l">Saved</div><div class="v">${l.posts.toLocaleString()} posts</div></div><div><div class="l">Library size</div><div class="v">${fmtB(l.bytes)}</div></div>` +
+    `<div><div class="l">Free space</div>${free}</div><div><div class="l">${s.running ? 'This session' : 'Last run'}</div><div class="v">${s.running ? '+' + (r ? r.posts : 0).toLocaleString() + ' new' : pnLastRunText(s)}</div></div>`;
+  if ($('#strip')._h !== stripHtml) { $('#strip')._h = stripHtml; $('#strip').innerHTML = stripHtml; }
+  $('#strip').hidden = false;
+}
+const P = initPanel($('#panel'), {
+  api: '/api/', mediaBase: '/files/', onStatus,
+  onViewNew: () => { closeModals(); window.scrollTo({top: 0, behavior: 'smooth'}); },
+  onFinished: (s, manual) => manual ? fetch('/rebuild', {method: 'POST', body: '{}'}).then(load) : load(),
+  onSidecars: sidecars
+});
+const openDrawer = tab => { P.poll(); P.showTab(tab); openModal('#dl'); };
+$('#btn-download').onclick = $('#pill').onclick = () => openDrawer('run');
+$('#btn-auto').onclick = () => openDrawer('auto');
+$('#btn-tools').onclick = () => openDrawer('tools');
+load();
+</script></body></html>
